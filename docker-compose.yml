@@ -1,5 +1,3 @@
-project_name: heroku-docker-nodejs
-
 web:
   build: .
   command: 'bash -c ''npm install; node app.js'''
