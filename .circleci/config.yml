@@ -1,53 +1,189 @@
-version: 2
+version: 2.1
+
+executors:
+  nodejs:
+    machine: true
+    working_directory: ~/app
+    environment:
+      NODE_ENV: ci
+
+aliases:
+  - &filter_only_master
+    branches:
+      only: master
+
+  - &filter_only_develop
+    branches:
+      only: develop
+
+  - &filter_wip_branch
+    branches:
+      ignore:
+        - master
+        - develop
+
+  - &init_docker_env
+    run:
+      name: Init environment variables for Docker
+      command: |
+        touch ~/app/.env
+        source ~/app/.env
+        echo "DOCKER_IMAGE_NAME='${DOCKER_APP_NAME}_web'" >> ~/app/.env
+        echo "DOCKER_TAG='0.0.${CIRCLE_BUILD_NUM:-0}-${CIRCLE_BRANCH}'" >> ~/app/.env
+        cat ~/app/.env >> $BASH_ENV
+        source ~/app/.env
+
+  - &log_docker_env
+    run:
+      name: Log Docker variables
+      command: |
+        echo CIRCLE_BRANCH: $CIRCLE_BRANCH
+        echo DOCKER_IMAGE_NAME: $DOCKER_IMAGE_NAME
+        echo DOCKER_TAG: $DOCKER_TAG
+
+  - &persist_docker_env
+    persist_to_workspace:
+      root: ~/app
+      paths: .env
+
+  - &restore_docker_env
+    attach_workspace:
+      at: ~/app
+
+  - &docker_hub_login
+    run:
+      name: Login to Docker Hub
+      command: echo $DOCKER_HUB_PASSWORD | docker login --username=$DOCKER_HUB_USERNAME --password-stdin
+
+  - &docker_hub_pull
+    run:
+      name: Pull Docker image from Docker Hub
+      command: |
+        docker pull $DOCKER_HUB_USERNAME/$DOCKER_IMAGE_NAME:$DOCKER_TAG
+
+params:
+  - &env
+    description: 'Angular Environment name (environment.<env>.ts)'
+    default: dev
+    type: string
+
+  - &herokuapp
+    description: 'Heroku application name set up for deployment'
+    type: string
+    default: ''
+
 jobs:
- build:
-   machine: true
-   steps:
-     - checkout
-     - run: touch .env
+  build:
+    executor: nodejs
+    parameters:
+      env: *env
+    steps:
+      - checkout
+      - *init_docker_env
+      - *log_docker_env
+      - *persist_docker_env
+      - run: docker info
+      - run:
+          name: Build Docker image
+          command: |
+            export ENV=<<parameters.env>>
+            docker-compose -p $DOCKER_APP_NAME build web
+            docker tag $DOCKER_IMAGE_NAME $DOCKER_IMAGE_NAME:$DOCKER_TAG
+      - *docker_hub_login
+      - run:
+          name: Deploy image to Docker Hub
+          command: |
+            docker tag $DOCKER_IMAGE_NAME:$DOCKER_TAG $DOCKER_HUB_USERNAME/$DOCKER_IMAGE_NAME:$DOCKER_TAG
+            docker push $DOCKER_HUB_USERNAME/$DOCKER_IMAGE_NAME
 
-     # build image
-     - run:
-        name: Build Docker image
-        command: |
-         docker info
-         export TAG="0.0.${CIRCLE_BUILD_NUM:-0}"
-         export DOCKER_IMAGE_NAME=${DOCKER_APP_NAME}_web
-         docker-compose -p $DOCKER_APP_NAME build web
-         docker tag $DOCKER_IMAGE_NAME $DOCKER_IMAGE_NAME:$TAG
+  test:
+    executor: nodejs
+    steps:
+      - *restore_docker_env
+      - *log_docker_env
+      - *docker_hub_login
+      - *docker_hub_pull
+      - run:
+          name: Test
+          command: |
+            docker run --rm $DOCKER_HUB_USERNAME/$DOCKER_IMAGE_NAME:$DOCKER_TAG npm test
 
-     # test
-     - run:
-        name: Test
-        command: |
-         docker-compose run --rm --service-ports npm test
+  deploy:
+    executor: nodejs
+    parameters:
+      herokuapp: *herokuapp
+    steps:
+      - *restore_docker_env
+      - *log_docker_env
+      - *docker_hub_login
+      - *docker_hub_pull
+      - run:
+          name: Deploy image to Heroku (Registry)
+          command: |
+            docker tag $DOCKER_IMAGE_NAME:$DOCKER_TAG registry.heroku.com/<<parameters.herokuapp>>/web
+            docker push registry.heroku.com/<<parameters.herokuapp>>/web
 
-     # deploy image to Docker Hub
-     - run:
-        name: Build Docker image
-        command: |
-         set -eu -o pipefail
-         echo $DOCKER_HUB_PASSWORD | docker login --username=$DOCKER_HUB_USERNAME --password-stdin
-         docker tag $DOCKER_IMAGE_NAME:$TAG ${DOCKER_HUB_USERNAME}/$DOCKER_IMAGE_NAME:$TAG
-         docker push $DOCKER_HUB_USERNAME/$DOCKER_IMAGE_NAME
+  release:
+    executor: nodejs
+    parameters:
+      herokuapp: *herokuapp
+    steps:
+      - *restore_docker_env
+      - *log_docker_env
+      - run:
+          name: Release app on Heroku
+          command: |
+            docker inspect registry.heroku.com/<<parameters.herokuapp>>/web --format={{.Id}} > WEB_DOCKER_IMAGE_ID_FILE
+            export WEB_DOCKER_IMAGE_ID=$(cat WEB_DOCKER_IMAGE_ID_FILE)
+            curl -n -X PATCH https://api.heroku.com/apps/<<parameters.herokuapp>>/formation \
+              -d '{
+                "updates": [ { "type": "web", "docker_image": "$WEB_DOCKER_IMAGE_ID" } ]
+              }' \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/vnd.heroku+json; version=3.docker-releases" \
+            -H "Authorization: Bearer $HEROKU_API_KEY"
 
-     # deploy image to Heroku (Registry)
-     - run:
-        name: Deploy image to Heroku (Registry)
-        command: |
-         set -eu -o pipefail
-         echo $HEROKU_API_KEY | docker login --username=$HEROKU_USERNAME --password-stdin registry.heroku.com
-         docker tag $DOCKER_IMAGE_NAME:$TAG registry.heroku.com/$HEROKU_APP_NAME/web
-         docker push registry.heroku.com/$HEROKU_APP_NAME/web
+workflows:
+  version: 2
 
-     # release app on Heroku
-     - run:
-        name: Release app on Heroku
-        command: |
-         docker inspect registry.heroku.com/$HEROKU_APP_NAME/web --format={{.Id}} > WEB_DOCKER_IMAGE_ID_FILE
-         export WEB_DOCKER_IMAGE_ID=$(cat WEB_DOCKER_IMAGE_ID_FILE)
-         curl -n -X PATCH https://api.heroku.com/apps/$HEROKU_APP_NAME/formation \
-            -d '{ "updates": [ { "type": "web", "docker_image": "'"$WEB_DOCKER_IMAGE_ID"'" }]}' \
-          -H "Content-Type: application/json" \
-          -H "Accept: application/vnd.heroku+json; version=3.docker-releases" \
-          -H "Authorization: Bearer $HEROKU_API_KEY"
+  build:
+    jobs:
+      - build:
+          filters: *filter_wip_branch
+      - test:
+          requires:
+            - build
+
+  deploy_dev:
+    jobs:
+      - build:
+          env: dev
+          filters: *filter_only_develop
+      - test:
+          requires:
+            - build
+      - deploy:
+          herokuapp: heroku-docker-nodejs-custom
+          requires:
+            - test
+
+  build_prod:
+    jobs:
+      - build:
+          env: prod
+          filters: *filter_only_master
+      - test:
+          requires:
+            - build
+      - deploy:
+          herokuapp: heroku-docker-nodejs-custom
+          requires:
+            - test
+      - release_hold: # <<< A job that will require manual approval in the CircleCI web application.
+          type: approval # <<< This key-value pair will set your workflow to a status of "On Hold"
+          requires: # It only runs the "hold" job when deploy has succeeded
+            - deploy
+      - release:
+          herokuapp: heroku-docker-nodejs-custom
+          requires:
+            - release_hold
