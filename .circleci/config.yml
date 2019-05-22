@@ -31,14 +31,22 @@ aliases:
     run:
       name: Init environment variables for Docker
       command: |
-        echo 'export DOCKER_TAG="0.0.${CIRCLE_BUILD_NUM:-0}"' >> $BASH_ENV
-        echo 'export DOCKER_IMAGE_NAME=${DOCKER_APP_NAME}_web' >> $BASH_ENV
         touch .env
+        echo 'export DOCKER_TAG="0.0.${CIRCLE_BUILD_NUM:-0}"' >> $BASH_ENV
+        echo DOCKER_TAG: ${DOCKER_TAG}
+        echo 'export DOCKER_IMAGE_NAME=${DOCKER_APP_NAME}_web' >> $BASH_ENV
+        echo DOCKER_IMAGE_NAME: ${DOCKER_IMAGE_NAME}
 
   - &docker_hub_login
     run:
       name: Login to Docker Hub
       command: echo $DOCKER_HUB_PASSWORD | docker login --username=$DOCKER_HUB_USERNAME --password-stdin
+
+  - &docker_hub_pull
+    run:
+      name: Pull Docker image from Docker Hub
+      command: |
+        docker pull $DOCKER_HUB_USERNAME/$DOCKER_IMAGE_NAME:$DOCKER_TAG
 
 params:
   - &env
@@ -80,10 +88,7 @@ jobs:
       - *log_branch
       - *init_docker_env
       - *docker_hub_login
-      - run:
-          name: Pull Docker image under test
-          command: |
-            docker pull $DOCKER_HUB_USERNAME/$DOCKER_IMAGE_NAME:$DOCKER_TAG
+      - *docker_hub_pull
       - run:
           name: Test
           command: |
@@ -97,6 +102,7 @@ jobs:
       - *log_branch
       - *init_docker_env
       - *docker_hub_login
+      - *docker_hub_pull
       - run:
           name: Deploy image to Heroku (Registry)
           command: |
@@ -116,10 +122,12 @@ jobs:
             docker inspect registry.heroku.com/<<parameters.herokuapp>>/web --format={{.Id}} > WEB_DOCKER_IMAGE_ID_FILE
             export WEB_DOCKER_IMAGE_ID=$(cat WEB_DOCKER_IMAGE_ID_FILE)
             curl -n -X PATCH https://api.heroku.com/apps/<<parameters.herokuapp>>/formation \
-               -d '{ "updates": [ { "type": "web", "docker_image": "'"$WEB_DOCKER_IMAGE_ID"'" }]}' \
-             -H "Content-Type: application/json" \
-             -H "Accept: application/vnd.heroku+json; version=3.docker-releases" \
-             -H "Authorization: Bearer $HEROKU_API_KEY"
+              -d '{
+                "updates": [ { "type": "web", "docker_image": "$WEB_DOCKER_IMAGE_ID" } ]
+              }' \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/vnd.heroku+json; version=3.docker-releases" \
+            -H "Authorization: Bearer $HEROKU_API_KEY"
 
 workflows:
   version: 2
