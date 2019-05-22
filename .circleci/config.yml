@@ -28,16 +28,22 @@ aliases:
       command: |
         touch ~/app/.env
         source ~/app/.env
-        echo "DOCKER_IMAGE_NAME='${DOCKER_APP_NAME}_web'" >> ~/app/.env
         echo "DOCKER_TAG='0.0.${CIRCLE_BUILD_NUM:-0}_${CIRCLE_BRANCH}'" >> ~/app/.env
+        echo "DOCKER_IMAGE_NAME='${DOCKER_APP_NAME}_web'" >> ~/app/.env
+        echo "DOCKER_HUB_IMAGE_PATH='$DOCKER_HUB_USERNAME/$DOCKER_IMAGE_NAME:$DOCKER_TAG'" >> ~/app/.env
+        echo "HEROKU_REGISTRY='registry.heroku.com'" >> ~/app/.env
+        echo "HEROKU_IMAGE_PATH='$HEROKU_REGISTRY/$HEROKU_APP_NAME/web'" >> ~/app/.env
 
   - &log_docker_env
     run:
       name: Log Docker variables
       command: |
         echo CIRCLE_BRANCH: $CIRCLE_BRANCH
-        echo DOCKER_IMAGE_NAME: $DOCKER_IMAGE_NAME
         echo DOCKER_TAG: $DOCKER_TAG
+        echo DOCKER_IMAGE_NAME: $DOCKER_IMAGE_NAME
+        echo DOCKER_HUB_IMAGE_PATH: $DOCKER_HUB_IMAGE_PATH
+        echo HEROKU_REGISTRY: $HEROKU_REGISTRY
+        echo HEROKU_IMAGE_PATH: $HEROKU_IMAGE_PATH
 
   - &persist_docker_env
     persist_to_workspace:
@@ -65,12 +71,12 @@ aliases:
     run:
       name: Pull Docker image from Docker Hub
       command: |
-        docker pull $DOCKER_HUB_USERNAME/$DOCKER_IMAGE_NAME:$DOCKER_TAG
+        docker pull $DOCKER_HUB_IMAGE_PATH
 
   - &docker_heroku_login
     run:
       name: Login to Docker Registry on Heroku
-      command: echo $HEROKU_API_KEY | docker login --username=$HEROKU_USERNAME --password-stdin registry.heroku.com
+      command: echo $HEROKU_API_KEY | docker login --username=$HEROKU_USERNAME --password-stdin $HEROKU_REGISTRY
 
 params:
   - &env
@@ -100,12 +106,11 @@ jobs:
           command: |
             export ENV=<<parameters.env>>
             docker-compose -p $DOCKER_APP_NAME build web
-            docker tag $DOCKER_IMAGE_NAME $DOCKER_IMAGE_NAME:$DOCKER_TAG
+            docker tag $DOCKER_IMAGE_NAME $DOCKER_HUB_IMAGE_PATH
       - *docker_hub_login
       - run:
           name: Deploy image to Docker Hub
           command: |
-            docker tag $DOCKER_IMAGE_NAME:$DOCKER_TAG $DOCKER_HUB_USERNAME/$DOCKER_IMAGE_NAME:$DOCKER_TAG
             docker push $DOCKER_HUB_USERNAME/$DOCKER_IMAGE_NAME
 
   test:
@@ -119,7 +124,7 @@ jobs:
       - run:
           name: Test
           command: |
-            docker run --rm $DOCKER_HUB_USERNAME/$DOCKER_IMAGE_NAME:$DOCKER_TAG npm test
+            docker run --rm $DOCKER_HUB_IMAGE_PATH npm test
 
   deploy:
     executor: nodejs
@@ -136,13 +141,13 @@ jobs:
           name: Deploy image to Heroku (Registry)
           command: |
             export HEROKU_APP_NAME=<<parameters.herokuapp>>
-            docker tag $DOCKER_HUB_USERNAME/$DOCKER_IMAGE_NAME:$DOCKER_TAG registry.heroku.com/$HEROKU_APP_NAME/web
-            docker push registry.heroku.com/$HEROKU_APP_NAME/web
+            docker tag $DOCKER_HUB_IMAGE_PATH $HEROKU_IMAGE_PATH
+            docker push $HEROKU_IMAGE_PATH
       - run:
           name: Release app on Heroku
           command: |
             export HEROKU_APP_NAME=<<parameters.herokuapp>>
-            docker inspect registry.heroku.com/$HEROKU_APP_NAME/web --format={{.Id}} > WEB_DOCKER_IMAGE_ID_FILE
+            docker inspect $HEROKU_IMAGE_PATH --format={{.Id}} > WEB_DOCKER_IMAGE_ID_FILE
             export WEB_DOCKER_IMAGE_ID=$(cat WEB_DOCKER_IMAGE_ID_FILE)
             curl -n -X PATCH https://api.heroku.com/apps/$HEROKU_APP_NAME/formation \
               -d '{
