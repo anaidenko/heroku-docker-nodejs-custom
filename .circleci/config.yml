@@ -33,12 +33,17 @@ aliases:
       command: |
         touch .env
         source .env
-        echo "DOCKER_TAG='0.0.${CIRCLE_BUILD_NUM:-0}'" >> .env
         echo "DOCKER_IMAGE_NAME='${DOCKER_APP_NAME}_web'" >> .env
+        echo "DOCKER_TAG='0.0.${CIRCLE_BUILD_NUM:-0}'" >> .env
         cat .env >> $BASH_ENV
         source .env
-        echo DOCKER_TAG: $DOCKER_TAG
+
+  - &log_docker_env
+    run:
+      name: Log Docker variables
+      command: |
         echo DOCKER_IMAGE_NAME: $DOCKER_IMAGE_NAME
+        echo DOCKER_TAG: $DOCKER_TAG
 
   - &persist_docker_env
     persist_to_workspace:
@@ -100,6 +105,7 @@ jobs:
     steps:
       - *log_branch
       - *restore_docker_env
+      - *log_docker_env
       - *docker_hub_login
       - *docker_hub_pull
       - run:
@@ -114,6 +120,7 @@ jobs:
     steps:
       - *log_branch
       - *restore_docker_env
+      - *log_docker_env
       - *docker_hub_login
       - *docker_hub_pull
       - run:
@@ -129,6 +136,7 @@ jobs:
     steps:
       - *log_branch
       - *restore_docker_env
+      - *log_docker_env
       - run:
           name: Release app on Heroku
           command: |
