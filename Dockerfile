@@ -1,7 +1,7 @@
 # Create image based on the official Node 12 image from the dockerhub
 FROM node:12.2.0-alpine
 
-ENV PORT=8080
+ENV PORT=4200
 
 RUN apk update && apk upgrade && \
   apk add --no-cache bash git openssh

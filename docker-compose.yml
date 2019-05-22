@@ -6,6 +6,6 @@ web:
    - /usr/src/appnode_modules
   env_file: .env
   environment:
-    PORT: 8080
+    PORT: 4200
   ports:
-    - 8080:8080
+    - 4200:4200
