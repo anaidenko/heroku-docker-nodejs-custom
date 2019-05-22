@@ -1,10 +1,10 @@
 unittests:
   build: .
   command: 'bash -c ''npm install; npm test'''
-  working_dir: /app/user
+  working_dir: /usr/src/app
   volumes:
-   - ./:/app/user/
-   - /app/user/node_modules
+   - ./:/usr/src/app
+   - /usr/src/appnode_modules
   env_file: .env
   environment:
     PORT: 8080

@@ -9,7 +9,7 @@
     "start": "pm2-runtime app.js --watch",
     "test": "mocha test/index.js",
     "docker:build": "docker-compose build web",
-    "docker:dev": "docker-compose run web"
+    "docker:start": "docker-compose run --service-ports web"
   },
   "dependencies": {
     "express": "^4.13.3",

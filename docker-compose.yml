@@ -1,25 +1,11 @@
 web:
-  build:
-    context: .
-    dockerfile: Dockerfile
-  working_dir: /app/user
-  volumes:
-   - ./:/app/user/
-   - /app/user/node_modules
-  env_file: .env
-  environment:
-    PORT: 8080
-  ports:
-    - '8080:8080'
-
-shell:
   build: .
-  command: bash
-  working_dir: /app/user
+  working_dir: /usr/src/app
+  volumes:
+   - ./:/usr/src/app
+   - /usr/src/appnode_modules
   env_file: .env
   environment:
     PORT: 8080
   ports:
-    - '8080:8080'
-  volumes:
-    - '.:/app/user'
+    - 8080:8080
