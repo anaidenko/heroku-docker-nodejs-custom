@@ -1,0 +1,13 @@
+machine:
+  services:
+    - docker
+
+dependencies:
+  pre:
+    - sudo pip install --upgrade docker-compose==1.3.0
+  override:
+    - docker-compose build
+
+test:
+  override:
+    - docker-compose run --service-ports web npm test
