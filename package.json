@@ -8,6 +8,7 @@
   "scripts": {
     "start": "pm2-runtime app.js --watch",
     "test": "mocha test/index.js",
+    "test:circleci": "circleci config validate",
     "docker:build": "docker-compose build web",
     "docker:start": "docker-compose run --service-ports web"
   },
@@ -16,6 +17,7 @@
     "mocha": "^2.3.3"
   },
   "devDependencies": {
+    "circleci": "^0.3.3",
     "pm2": "^3.5.0"
   }
 }
