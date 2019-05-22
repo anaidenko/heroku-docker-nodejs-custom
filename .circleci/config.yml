@@ -1,53 +1,155 @@
-version: 2
+version: 2.1
+
+executors:
+  nodejs:
+    machine: true
+    working_directory: ~/app
+    # docker:
+    #   - image: circleci/node:12.2.0
+    environment:
+      NODE_ENV: ci
+
+aliases:
+  - &filter_only_master
+    branches:
+      only: master
+
+  - &filter_only_develop
+    branches:
+      only: develop
+
+  - &filter_wip_branch
+    branches:
+      ignore:
+        - master
+        - develop
+
+  - &log_branch
+    run:
+      name: Show current branch
+      command: echo ${CIRCLE_BRANCH}
+
+params:
+  - &env
+    description: 'Angular Environment name (environment.<env>.ts)'
+    default: dev
+    type: string
+
+  - &herokuapp
+    description: 'Heroku application name set up for deployment'
+    type: string
+    default: ''
+
 jobs:
- build:
-   machine: true
-   steps:
-     - checkout
-     - run: touch .env
+  build:
+    executor: nodejs
+    parameters:
+      env: *env
+    steps:
+      - *log_branch
+      - checkout
+      - setup_remote_docker
+      - run: touch .env
+      - run: docker info
+      - run:
+          name: Build Docker image
+          command: |
+            export TAG="0.0.${CIRCLE_BUILD_NUM:-0}"
+            export DOCKER_IMAGE_NAME=${DOCKER_APP_NAME}_web
+            export ENV=<<parameters.env>>
+            docker-compose -p $DOCKER_APP_NAME build web
+            docker tag $DOCKER_IMAGE_NAME $DOCKER_IMAGE_NAME:$TAG
+      - run:
+          name: Deploy image to Docker Hub
+          command: |
+            set -eu -o pipefail
+            echo $DOCKER_HUB_PASSWORD | docker login --username=$DOCKER_HUB_USERNAME --password-stdin
+            docker tag $DOCKER_IMAGE_NAME:$TAG ${DOCKER_HUB_USERNAME}/$DOCKER_IMAGE_NAME:$TAG
+            docker push $DOCKER_HUB_USERNAME/$DOCKER_IMAGE_NAME
 
-     # build image
-     - run:
-        name: Build Docker image
-        command: |
-         docker info
-         export TAG="0.0.${CIRCLE_BUILD_NUM:-0}"
-         export DOCKER_IMAGE_NAME=${DOCKER_APP_NAME}_web
-         docker-compose -p $DOCKER_APP_NAME build web
-         docker tag $DOCKER_IMAGE_NAME $DOCKER_IMAGE_NAME:$TAG
+  test:
+    executor: nodejs
+    steps:
+      - *log_branch
+      - setup_remote_docker
+      - run:
+          name: Test
+          command: |
+            docker-compose run --rm --service-ports npm test
 
-     # test
-     - run:
-        name: Test
-        command: |
-         docker-compose run --rm --service-ports npm test
+  deploy:
+    executor: nodejs
+    parameters:
+      herokuapp: *herokuapp
+    steps:
+      - *log_branch
+      - setup_remote_docker
+      - run:
+          name: Deploy image to Heroku (Registry)
+          command: |
+            set -eu -o pipefail
+            echo $HEROKU_API_KEY | docker login --username=$HEROKU_USERNAME --password-stdin registry.heroku.com
+            docker tag $DOCKER_IMAGE_NAME:$TAG registry.heroku.com/<<parameters.herokuapp>>/web
+            docker push registry.heroku.com/<<parameters.herokuapp>>/web
 
-     # deploy image to Docker Hub
-     - run:
-        name: Build Docker image
-        command: |
-         set -eu -o pipefail
-         echo $DOCKER_HUB_PASSWORD | docker login --username=$DOCKER_HUB_USERNAME --password-stdin
-         docker tag $DOCKER_IMAGE_NAME:$TAG ${DOCKER_HUB_USERNAME}/$DOCKER_IMAGE_NAME:$TAG
-         docker push $DOCKER_HUB_USERNAME/$DOCKER_IMAGE_NAME
+  release:
+    executor: nodejs
+    parameters:
+      herokuapp: *herokuapp
+    steps:
+      - *log_branch
+      - setup_remote_docker
+      - run:
+          name: Release app on Heroku
+          command: |
+            docker inspect registry.heroku.com/<<parameters.herokuapp>>/web --format={{.Id}} > WEB_DOCKER_IMAGE_ID_FILE
+            export WEB_DOCKER_IMAGE_ID=$(cat WEB_DOCKER_IMAGE_ID_FILE)
+            curl -n -X PATCH https://api.heroku.com/apps/<<parameters.herokuapp>>/formation \
+               -d '{ "updates": [ { "type": "web", "docker_image": "'"$WEB_DOCKER_IMAGE_ID"'" }]}' \
+             -H "Content-Type: application/json" \
+             -H "Accept: application/vnd.heroku+json; version=3.docker-releases" \
+             -H "Authorization: Bearer $HEROKU_API_KEY"
 
-     # deploy image to Heroku (Registry)
-     - run:
-        name: Deploy image to Heroku (Registry)
-        command: |
-         set -eu -o pipefail
-         echo $HEROKU_API_KEY | docker login --username=$HEROKU_USERNAME --password-stdin registry.heroku.com
-         docker tag $DOCKER_IMAGE_NAME:$TAG registry.heroku.com/$HEROKU_APP_NAME/web
-         docker push registry.heroku.com/$HEROKU_APP_NAME/web
+workflows:
+  version: 2
 
-     # release app on Heroku
-     - run:
-        name: Release app on Heroku
-        command: |
-         docker inspect registry.heroku.com/$HEROKU_APP_NAME/web --format={{.Id}} > WEB_DOCKER_IMAGE_ID_FILE
-         export WEB_DOCKER_IMAGE_ID=$(cat WEB_DOCKER_IMAGE_ID_FILE)
-         curl -n -X PATCH https://api.heroku.com/apps/$HEROKU_APP_NAME/formation \
-            -d '{ "updates": [ { "type": "web", "docker_image": "'"$WEB_DOCKER_IMAGE_ID"'" }]}' \
-          -H "Content-Type: application/json" \
-          -H "Accept: application/vnd.heroku+json; version=3.docker-releases" \
-          -H "Authorization: Bearer $HEROKU_API_KEY"
+  build:
+    jobs:
+      - build:
+          filters: *filter_wip_branch
+      - test:
+          requires:
+            - build
+
+  deploy_dev:
+    jobs:
+      - build:
+          env: dev
+          filters: *filter_only_develop
+      - test:
+          requires:
+            - build
+      - deploy:
+          herokuapp: heroku-docker-nodejs-custom
+          requires:
+            - test
+
+  build_prod:
+    jobs:
+      - build:
+          filters: *filter_only_master
+      - test:
+          requires:
+            - build
+      - deploy:
+          herokuapp: heroku-docker-nodejs-custom
+          requires:
+            - test
+      - release_hold: # <<< A job that will require manual approval in the CircleCI web application.
+          type: approval # <<< This key-value pair will set your workflow to a status of "On Hold"
+          requires: # We only run the "hold" job when deploy has succeeded
+            - deploy
+      - release:
+          herokuapp: heroku-docker-nodejs-custom
+          requires:
+            - release_hold
