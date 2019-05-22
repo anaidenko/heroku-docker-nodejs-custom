@@ -60,7 +60,7 @@ jobs:
     steps:
       - *log_branch
       - checkout
-      - setup_remote_docker
+      # - setup_remote_docker
       - *init_docker_env
       - run: touch .env
       - run: docker info
@@ -76,21 +76,19 @@ jobs:
           name: Deploy image to Docker Hub
           command: |
             # set -eu -o pipefail
-            docker tag $DOCKER_IMAGE_NAME:$DOCKER_TAG ${DOCKER_HUB_USERNAME}/$DOCKER_IMAGE_NAME:$DOCKER_TAG
+            docker tag $DOCKER_IMAGE_NAME:$DOCKER_TAG $DOCKER_HUB_USERNAME/$DOCKER_IMAGE_NAME:$DOCKER_TAG
             docker push $DOCKER_HUB_USERNAME/$DOCKER_IMAGE_NAME
 
   test:
     executor: nodejs
     steps:
       - *log_branch
-      - setup_remote_docker
+      # - setup_remote_docker
       - *init_docker_env
       - *docker_hub_login
       - run:
           name: Pull Docker image under test
           command: |
-            # set -eu -o pipefail
-            echo $DOCKER_HUB_PASSWORD | docker login --username=$DOCKER_HUB_USERNAME --password-stdin
             docker pull $DOCKER_HUB_USERNAME/$DOCKER_IMAGE_NAME:$DOCKER_TAG
       - run:
           name: Test
@@ -103,7 +101,7 @@ jobs:
       herokuapp: *herokuapp
     steps:
       - *log_branch
-      - setup_remote_docker
+      # - setup_remote_docker
       - *init_docker_env
       - *docker_hub_login
       - run:
@@ -119,7 +117,7 @@ jobs:
       herokuapp: *herokuapp
     steps:
       - *log_branch
-      - setup_remote_docker
+      # - setup_remote_docker
       - *init_docker_env
       - run:
           name: Release app on Heroku
