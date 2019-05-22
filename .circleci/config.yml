@@ -30,19 +30,16 @@ aliases:
         source ~/app/.env
 
         export DOCKER_TAG="0.0.${CIRCLE_BUILD_NUM:-0}_${CIRCLE_BRANCH}"
-        echo "export DOCKER_TAG='$DOCKER_TAG'" >> ~/app/.env
-
         export DOCKER_IMAGE_NAME="${DOCKER_APP_NAME}_web"
-        echo "export DOCKER_IMAGE_NAME='$DOCKER_IMAGE_NAME'" >> ~/app/.env
-
         export DOCKER_HUB_IMAGE_PATH="$DOCKER_HUB_USERNAME/$DOCKER_IMAGE_NAME:$DOCKER_TAG"
-        echo "export DOCKER_HUB_IMAGE_PATH='$DOCKER_HUB_IMAGE_PATH'" >> ~/app/.env
-
         export HEROKU_REGISTRY="registry.heroku.com"
-        echo "export HEROKU_REGISTRY='$HEROKU_REGISTRY'" >> ~/app/.env
-
         export HEROKU_IMAGE_PATH="$HEROKU_REGISTRY/$HEROKU_APP_NAME/web"
-        echo "export HEROKU_IMAGE_PATH='$HEROKU_IMAGE_PATH'" >> ~/app/.env
+
+        echo "DOCKER_TAG='$DOCKER_TAG'" >> ~/app/.env
+        echo "DOCKER_IMAGE_NAME='$DOCKER_IMAGE_NAME'" >> ~/app/.env
+        echo "DOCKER_HUB_IMAGE_PATH='$DOCKER_HUB_IMAGE_PATH'" >> ~/app/.env
+        echo "HEROKU_REGISTRY='$HEROKU_REGISTRY'" >> ~/app/.env
+        echo "HEROKU_IMAGE_PATH='$HEROKU_IMAGE_PATH'" >> ~/app/.env
 
   - &log_docker_env
     run:
