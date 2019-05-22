@@ -3,7 +3,7 @@ version: 2.1
 executors:
   nodejs:
     machine: true
-    working_directory: ~/
+    working_directory: ~/app
     environment:
       NODE_ENV: ci
 
@@ -42,12 +42,12 @@ aliases:
 
   - &persist_docker_env
     persist_to_workspace:
-      root: ~/
+      root: ~/app
       paths: .env
 
   - &restore_docker_env
     attach_workspace:
-      at: ~/
+      at: ~/app
 
   - &docker_hub_login
     run:
