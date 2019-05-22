@@ -29,7 +29,7 @@ aliases:
         touch ~/app/.env
         source ~/app/.env
         echo "DOCKER_IMAGE_NAME='${DOCKER_APP_NAME}_web'" >> ~/app/.env
-        echo "DOCKER_TAG='0.0.${CIRCLE_BUILD_NUM:-0}-${CIRCLE_BRANCH}'" >> ~/app/.env
+        echo "DOCKER_TAG='0.0.${CIRCLE_BUILD_NUM:-0}_${CIRCLE_BRANCH}'" >> ~/app/.env
         cat ~/app/.env >> $BASH_ENV
         source ~/app/.env
 
@@ -163,7 +163,7 @@ workflows:
           requires:
             - build
       - deploy:
-          herokuapp: heroku-docker-nodejs-custom
+          herokuapp: heroku-docker-nodejs-custom-dev
           requires:
             - test
 
