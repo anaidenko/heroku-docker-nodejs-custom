@@ -4,4 +4,6 @@ FROM heroku/nodejs
 RUN apt-get update && apt-get install -y \
   curl
 
-CMD ['node', 'app.js']
+RUN npm install
+
+CMD npm install; node app.js
