@@ -33,13 +33,11 @@ aliases:
         export DOCKER_IMAGE_NAME="${DOCKER_APP_NAME}_web"
         export DOCKER_HUB_IMAGE_PATH="$DOCKER_HUB_USERNAME/$DOCKER_IMAGE_NAME:$DOCKER_TAG"
         export HEROKU_REGISTRY="registry.heroku.com"
-        export HEROKU_IMAGE_PATH="$HEROKU_REGISTRY/$HEROKU_APP_NAME/web"
 
         echo "DOCKER_TAG='$DOCKER_TAG'" >> ~/app/.env
         echo "DOCKER_IMAGE_NAME='$DOCKER_IMAGE_NAME'" >> ~/app/.env
         echo "DOCKER_HUB_IMAGE_PATH='$DOCKER_HUB_IMAGE_PATH'" >> ~/app/.env
         echo "HEROKU_REGISTRY='$HEROKU_REGISTRY'" >> ~/app/.env
-        echo "HEROKU_IMAGE_PATH='$HEROKU_IMAGE_PATH'" >> ~/app/.env
 
   - &log_docker_env
     run:
@@ -104,7 +102,7 @@ jobs:
       - run: docker info
       - *docker_hub_login
       - run:
-          name: Build Docker image
+          name: Build docker image
           command: |
             export ENV=<<parameters.env>>
             docker-compose -p $DOCKER_APP_NAME build web
@@ -140,10 +138,11 @@ jobs:
       - *docker_hub_pull
       - *docker_heroku_login
       - run:
-          name: Deploy image to Heroku (Registry)
+          name: Deploy docker image to Heroku Registry
           command: |
             export HEROKU_APP_NAME=<<parameters.herokuapp>>
             export HEROKU_IMAGE_PATH=$HEROKU_REGISTRY/$HEROKU_APP_NAME/web
+            echo "HEROKU_IMAGE_PATH='$HEROKU_IMAGE_PATH'" >> ~/app/.env
             docker tag $DOCKER_HUB_IMAGE_PATH $HEROKU_IMAGE_PATH
             docker push $HEROKU_IMAGE_PATH
       - run:
