@@ -16,11 +16,16 @@ jobs:
 
      # deploy image
      - run: |
-         TAG="0.0.${CIRCLE_BUILD_NUM}"
          set -eu -o pipefail
          echo $HEROKU_API_KEY | docker login --username=$HEROKU_USERNAME --password-stdin registry.heroku.com
+
+         TAG="0.0.${CIRCLE_BUILD_NUM}"
          docker tag herokudockernodejscustom_web registry.heroku.com/$HEROKU_APP_NAME/web:$TAG
+         docker tag herokudockernodejscustom_web registry.heroku.com/$HEROKU_APP_NAME/web:latest
+
          docker push registry.heroku.com/$HEROKU_APP_NAME/web
+
+         # release
          docker inspect registry.heroku.com/$HEROKU_APP_NAME/web --format={{.Id}} > WEB_DOCKER_IMAGE_ID_FILE
          export WEB_DOCKER_IMAGE_ID=$(cat WEB_DOCKER_IMAGE_ID_FILE)
          curl -n -X PATCH https://api.heroku.com/apps/$HEROKU_APP_NAME/formation \
