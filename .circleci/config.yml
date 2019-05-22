@@ -29,6 +29,18 @@ aliases:
       name: Show current branch
       command: echo ${CIRCLE_BRANCH}
 
+  - &init_docker_env
+    run:
+      name: Init environment variables for Docker
+      command: |
+        export DOCKER_TAG="0.0.${CIRCLE_BUILD_NUM:-0}"
+        export DOCKER_IMAGE_NAME=${DOCKER_APP_NAME}_web
+
+  - &docker_hub_login
+    run:
+      name: Login to Docker Hub
+      command: echo $DOCKER_HUB_PASSWORD | docker login --username=$DOCKER_HUB_USERNAME --password-stdin
+
 params:
   - &env
     description: 'Angular Environment name (environment.<env>.ts)'
@@ -49,22 +61,22 @@ jobs:
       - *log_branch
       - checkout
       - setup_remote_docker
+      - *init_docker_env
       - run: touch .env
       - run: docker info
       - run:
           name: Build Docker image
           command: |
-            export TAG="0.0.${CIRCLE_BUILD_NUM:-0}"
-            export DOCKER_IMAGE_NAME=${DOCKER_APP_NAME}_web
+            # set -eu -o pipefail
             export ENV=<<parameters.env>>
             docker-compose -p $DOCKER_APP_NAME build web
-            docker tag $DOCKER_IMAGE_NAME $DOCKER_IMAGE_NAME:$TAG
+            docker tag $DOCKER_IMAGE_NAME $DOCKER_IMAGE_NAME:$DOCKER_TAG
+      - *docker_hub_login
       - run:
           name: Deploy image to Docker Hub
           command: |
-            set -eu -o pipefail
-            echo $DOCKER_HUB_PASSWORD | docker login --username=$DOCKER_HUB_USERNAME --password-stdin
-            docker tag $DOCKER_IMAGE_NAME:$TAG ${DOCKER_HUB_USERNAME}/$DOCKER_IMAGE_NAME:$TAG
+            # set -eu -o pipefail
+            docker tag $DOCKER_IMAGE_NAME:$DOCKER_TAG ${DOCKER_HUB_USERNAME}/$DOCKER_IMAGE_NAME:$DOCKER_TAG
             docker push $DOCKER_HUB_USERNAME/$DOCKER_IMAGE_NAME
 
   test:
@@ -72,10 +84,18 @@ jobs:
     steps:
       - *log_branch
       - setup_remote_docker
+      - *init_docker_env
+      - *docker_hub_login
+      - run:
+          name: Pull Docker image under test
+          command: |
+            # set -eu -o pipefail
+            echo $DOCKER_HUB_PASSWORD | docker login --username=$DOCKER_HUB_USERNAME --password-stdin
+            docker pull $DOCKER_HUB_USERNAME/$DOCKER_IMAGE_NAME:$DOCKER_TAG
       - run:
           name: Test
           command: |
-            docker-compose run --rm --service-ports npm test
+            docker run --rm $DOCKER_HUB_USERNAME/$DOCKER_IMAGE_NAME:$DOCKER_TAG npm test
 
   deploy:
     executor: nodejs
@@ -84,12 +104,13 @@ jobs:
     steps:
       - *log_branch
       - setup_remote_docker
+      - *init_docker_env
+      - *docker_hub_login
       - run:
           name: Deploy image to Heroku (Registry)
           command: |
-            set -eu -o pipefail
-            echo $HEROKU_API_KEY | docker login --username=$HEROKU_USERNAME --password-stdin registry.heroku.com
-            docker tag $DOCKER_IMAGE_NAME:$TAG registry.heroku.com/<<parameters.herokuapp>>/web
+            # set -eu -o pipefail
+            docker tag $DOCKER_IMAGE_NAME:$DOCKER_TAG registry.heroku.com/<<parameters.herokuapp>>/web
             docker push registry.heroku.com/<<parameters.herokuapp>>/web
 
   release:
@@ -99,6 +120,7 @@ jobs:
     steps:
       - *log_branch
       - setup_remote_docker
+      - *init_docker_env
       - run:
           name: Release app on Heroku
           command: |
@@ -147,7 +169,7 @@ workflows:
             - test
       - release_hold: # <<< A job that will require manual approval in the CircleCI web application.
           type: approval # <<< This key-value pair will set your workflow to a status of "On Hold"
-          requires: # We only run the "hold" job when deploy has succeeded
+          requires: # It only runs the "hold" job when deploy has succeeded
             - deploy
       - release:
           herokuapp: heroku-docker-nodejs-custom
