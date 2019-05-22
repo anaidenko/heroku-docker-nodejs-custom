@@ -6,11 +6,9 @@ jobs:
      - checkout
      - run: touch .env
 
-     - setup_remote_docker
-
      # test
      - run: |
-         docker-compose -f docker-compose.unittests.yml run --rm unittests
+         docker-compose -f docker-compose.unittests.yml run --rm --service-ports unittests
 
      # build image
      - run: |

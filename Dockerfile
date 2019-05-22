@@ -6,4 +6,4 @@ RUN apt-get update && apt-get install -y \
 
 RUN npm install
 
-CMD npm install; node app.js
+CMD node app.js
