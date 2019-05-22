@@ -44,13 +44,7 @@ aliases:
   - &log_docker_env
     run:
       name: Log Docker variables
-      command: |
-        echo CIRCLE_BRANCH: $CIRCLE_BRANCH
-        echo DOCKER_TAG: $DOCKER_TAG
-        echo DOCKER_IMAGE_NAME: $DOCKER_IMAGE_NAME
-        echo DOCKER_HUB_IMAGE_PATH: $DOCKER_HUB_IMAGE_PATH
-        echo HEROKU_REGISTRY: $HEROKU_REGISTRY
-        echo HEROKU_IMAGE_PATH: $HEROKU_IMAGE_PATH
+      command: cat ~/app/.env
 
   - &persist_docker_env
     persist_to_workspace:
@@ -149,14 +143,15 @@ jobs:
           name: Deploy image to Heroku (Registry)
           command: |
             export HEROKU_APP_NAME=<<parameters.herokuapp>>
+            export HEROKU_IMAGE_PATH=$HEROKU_REGISTRY/$HEROKU_APP_NAME/web
             docker tag $DOCKER_HUB_IMAGE_PATH $HEROKU_IMAGE_PATH
             docker push $HEROKU_IMAGE_PATH
       - run:
           name: Release app on Heroku
           command: |
             export HEROKU_APP_NAME=<<parameters.herokuapp>>
-            docker inspect $HEROKU_IMAGE_PATH --format={{.Id}} > WEB_DOCKER_IMAGE_ID_FILE
-            export WEB_DOCKER_IMAGE_ID=$(cat WEB_DOCKER_IMAGE_ID_FILE)
+            export HEROKU_IMAGE_PATH=$HEROKU_REGISTRY/$HEROKU_APP_NAME/web
+            export WEB_DOCKER_IMAGE_ID=$(docker inspect $HEROKU_IMAGE_PATH --format={{.Id}})
             curl -n -X PATCH https://api.heroku.com/apps/$HEROKU_APP_NAME/formation \
               -d '{
                 "updates": [ { "type": "web", "docker_image": "'"$WEB_DOCKER_IMAGE_ID"'" } ]
