@@ -26,12 +26,12 @@ aliases:
     run:
       name: Init environment variables for Docker
       command: |
-        touch .env
-        source .env
-        echo "DOCKER_IMAGE_NAME='${DOCKER_APP_NAME}_web'" >> .env
-        echo "DOCKER_TAG='0.0.${CIRCLE_BUILD_NUM:-0}'" >> .env
-        cat .env >> $BASH_ENV
-        source .env
+        touch ~/app/.env
+        source ~/app/.env
+        echo "DOCKER_IMAGE_NAME='${DOCKER_APP_NAME}_web'" >> ~/app/.env
+        echo "DOCKER_TAG='0.0.${CIRCLE_BUILD_NUM:-0}'" >> ~/app/.env
+        cat ~/app/.env >> $BASH_ENV
+        source ~/app/.env
 
   - &log_docker_env
     run:
@@ -43,12 +43,12 @@ aliases:
 
   - &persist_docker_env
     persist_to_workspace:
-      root: ~/
+      root: ~/app
       paths: .env
 
   - &restore_docker_env
     attach_workspace:
-      at: ~/
+      at: ~/app
 
   - &docker_hub_login
     run:
