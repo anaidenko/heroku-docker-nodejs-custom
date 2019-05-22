@@ -2,11 +2,21 @@
   "name": "heroku-docker-nodejs",
   "private": true,
   "version": "0.0.0",
+  "engines": {
+    "node": "12.2.0"
+  },
+  "scripts": {
+    "test": "mocha test/index.js",
+    "start": "nodemon app.js",
+    "start:pm2": "pm2-runtime app.js",
+    "docker:build": "docker-compose -f docker-compose.yml build web",
+    "docker:dev": "docker-compose run --service-ports web npm run start:pm2 && bash"
+  },
   "dependencies": {
     "express": "^4.13.3",
     "mocha": "^2.3.3"
   },
-  "scripts": {
-    "test": "mocha test/index.js"
+  "devDependencies": {
+    "nodemon": "^1.19.0"
   }
 }
