@@ -1,6 +1,7 @@
 web:
-  build: .
-  command: 'bash -c ''npm install; npm start'''
+  build:
+    context: .
+    dockerfile: Dockerfile
   working_dir: /app/user
   volumes:
    - ./:/app/user/
