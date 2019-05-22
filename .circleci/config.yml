@@ -193,11 +193,11 @@ workflows:
       - test:
           requires:
             - build
-      - deploy_hold: # <<< A job that will require manual approval in the CircleCI web application.
+      - deploy_confirm: # <<< A job that will require manual approval in the CircleCI web application.
           type: approval # <<< This key-value pair will set your workflow to a status of "On Hold"
           requires: # It only runs the "hold" job when deploy has succeeded
             - test
       - deploy:
           herokuapp: heroku-docker-nodejs-custom
           requires:
-            - deploy_hold
+            - deploy_confirm
