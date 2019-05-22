@@ -36,6 +36,7 @@ aliases:
         export HEROKU_REGISTRY="registry.heroku.com"
 
         echo "DOCKER_TAG='$DOCKER_TAG'" >> ~/app/.env
+        echo "DOCKER_APP_NAME='$DOCKER_APP_NAME'" >> ~/app/.env
         echo "DOCKER_IMAGE_NAME='$DOCKER_IMAGE_NAME'" >> ~/app/.env
         echo "DOCKER_HUB_IMAGE_PATH='$DOCKER_HUB_IMAGE_PATH'" >> ~/app/.env
         echo "HEROKU_REGISTRY='$HEROKU_REGISTRY'" >> ~/app/.env
