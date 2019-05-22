@@ -53,7 +53,7 @@ aliases:
     run:
       name: Load environment variables shared via .env file
       command: |
-        cat ~/app/.env >> $BASH_ENV
+        cat ~/app/.env >> ${BASH_ENV:-.env.ci}
         source ~/app/.env
 
   - &docker_hub_login
@@ -129,23 +129,16 @@ jobs:
       - run:
           name: Deploy image to Heroku (Registry)
           command: |
-            docker tag $DOCKER_IMAGE_NAME:$DOCKER_TAG registry.heroku.com/<<parameters.herokuapp>>/web
-            docker push registry.heroku.com/<<parameters.herokuapp>>/web
-
-  release:
-    executor: nodejs
-    parameters:
-      herokuapp: *herokuapp
-    steps:
-      - *attach_docker_env
-      - *load_docker_env
-      - *log_docker_env
+            export HEROKU_APP_NAME=<<parameters.herokuapp>>
+            docker tag $DOCKER_HUB_USERNAME/$DOCKER_IMAGE_NAME:$DOCKER_TAG registry.heroku.com/$HEROKU_APP_NAME/web
+            docker push registry.heroku.com/$HEROKU_APP_NAME/web
       - run:
           name: Release app on Heroku
           command: |
-            docker inspect registry.heroku.com/<<parameters.herokuapp>>/web --format={{.Id}} > WEB_DOCKER_IMAGE_ID_FILE
+            export HEROKU_APP_NAME=<<parameters.herokuapp>>
+            docker inspect registry.heroku.com/$HEROKU_APP_NAME/web --format={{.Id}} > WEB_DOCKER_IMAGE_ID_FILE
             export WEB_DOCKER_IMAGE_ID=$(cat WEB_DOCKER_IMAGE_ID_FILE)
-            curl -n -X PATCH https://api.heroku.com/apps/<<parameters.herokuapp>>/formation \
+            curl -n -X PATCH https://api.heroku.com/apps/$HEROKU_APP_NAME/formation \
               -d '{
                 "updates": [ { "type": "web", "docker_image": "$WEB_DOCKER_IMAGE_ID" } ]
               }' \
@@ -185,15 +178,11 @@ workflows:
       - test:
           requires:
             - build
+      - deploy_hold: # <<< A job that will require manual approval in the CircleCI web application.
+          type: approval # <<< This key-value pair will set your workflow to a status of "On Hold"
+          requires: # It only runs the "hold" job when deploy has succeeded
+            - test
       - deploy:
           herokuapp: heroku-docker-nodejs-custom
           requires:
-            - test
-      - release_hold: # <<< A job that will require manual approval in the CircleCI web application.
-          type: approval # <<< This key-value pair will set your workflow to a status of "On Hold"
-          requires: # It only runs the "hold" job when deploy has succeeded
-            - deploy
-      - release:
-          herokuapp: heroku-docker-nodejs-custom
-          requires:
-            - release_hold
+            - deploy_hold
