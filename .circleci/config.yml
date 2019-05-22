@@ -101,16 +101,17 @@ jobs:
       - *log_docker_env
       - *persist_docker_env
       - run: docker info
+      - *docker_hub_login
       - run:
           name: Build Docker image
           command: |
             export ENV=<<parameters.env>>
             docker-compose -p $DOCKER_APP_NAME build web
-            docker tag $DOCKER_IMAGE_NAME $DOCKER_HUB_IMAGE_PATH
-      - *docker_hub_login
+            docker tag $DOCKER_IMAGE_NAME $DOCKER_IMAGE_NAME:$DOCKER_TAG
       - run:
           name: Deploy image to Docker Hub
           command: |
+            docker tag $DOCKER_IMAGE_NAME:$DOCKER_TAG $DOCKER_HUB_IMAGE_PATH
             docker push $DOCKER_HUB_USERNAME/$DOCKER_IMAGE_NAME
 
   test:
