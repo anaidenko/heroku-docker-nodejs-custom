@@ -22,11 +22,6 @@ aliases:
         - master
         - develop
 
-  - &log_branch
-    run:
-      name: Show current branch
-      command: echo ${CIRCLE_BRANCH}
-
   - &init_docker_env
     run:
       name: Init environment variables for Docker
@@ -42,17 +37,18 @@ aliases:
     run:
       name: Log Docker variables
       command: |
+        echo CIRCLE_BRANCH: $CIRCLE_BRANCH
         echo DOCKER_IMAGE_NAME: $DOCKER_IMAGE_NAME
         echo DOCKER_TAG: $DOCKER_TAG
 
   - &persist_docker_env
     persist_to_workspace:
-      root: ~/app
+      root: ~/
       paths: .env
 
   - &restore_docker_env
     attach_workspace:
-      at: ~/app
+      at: ~/
 
   - &docker_hub_login
     run:
@@ -82,9 +78,9 @@ jobs:
     parameters:
       env: *env
     steps:
-      - *log_branch
       - checkout
       - *init_docker_env
+      - *log_docker_env
       - *persist_docker_env
       - run: docker info
       - run:
@@ -103,7 +99,6 @@ jobs:
   test:
     executor: nodejs
     steps:
-      - *log_branch
       - *restore_docker_env
       - *log_docker_env
       - *docker_hub_login
@@ -118,7 +113,6 @@ jobs:
     parameters:
       herokuapp: *herokuapp
     steps:
-      - *log_branch
       - *restore_docker_env
       - *log_docker_env
       - *docker_hub_login
@@ -134,7 +128,6 @@ jobs:
     parameters:
       herokuapp: *herokuapp
     steps:
-      - *log_branch
       - *restore_docker_env
       - *log_docker_env
       - run:
