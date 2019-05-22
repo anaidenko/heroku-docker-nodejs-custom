@@ -12,7 +12,7 @@ jobs:
      # build image
      - run: |
          docker info
-         docker-compose -f docker-compose.yml -p $HEROKU_APP_NAME --build run -d --service-ports web
+         docker-compose -f docker-compose.yml -p $HEROKU_APP_NAME build web
 
      # deploy image
      - run: |
