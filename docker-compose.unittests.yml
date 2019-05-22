@@ -1,4 +1,4 @@
-web:
+unittests:
   build: .
   command: 'bash -c ''npm install; npm test'''
   working_dir: /app/user
