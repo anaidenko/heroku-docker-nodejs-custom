@@ -29,7 +29,7 @@ aliases:
         touch ~/app/.env
         source ~/app/.env
 
-        export DOCKER_TAG="0.0.${CIRCLE_BUILD_NUM:-0}_${CIRCLE_BRANCH}"
+        export DOCKER_TAG="0.0.${CIRCLE_BUILD_NUM:-0}-${CIRCLE_BRANCH//[^a-z0-9]/_}"
         export DOCKER_APP_NAME="herokudockernodejscustom"
         export DOCKER_IMAGE_NAME="${DOCKER_APP_NAME}_web"
         export DOCKER_HUB_IMAGE_PATH="$DOCKER_HUB_USERNAME/$DOCKER_IMAGE_NAME:$DOCKER_TAG"
