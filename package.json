@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "express": "^4.13.3",
-    "mocha": "^2.3.3"
+    "mocha": "^10.1.0"
   },
   "devDependencies": {
     "circleci": "^0.3.3",
