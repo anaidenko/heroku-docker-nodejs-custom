@@ -13,7 +13,7 @@
     "docker:start": "docker-compose run --service-ports web"
   },
   "dependencies": {
-    "express": "^4.13.3",
+    "express": "^4.17.3",
     "mocha": "^2.3.3"
   },
   "devDependencies": {
